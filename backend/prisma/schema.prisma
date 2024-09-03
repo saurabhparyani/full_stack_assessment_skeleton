@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model home {
+  homeId         Int              @id @default(autoincrement())
+  street_address String           @db.VarChar(255)
+  state          String?          @db.VarChar(50)
+  zip            String?          @db.VarChar(10)
+  sqft           Float?           @db.Float
+  beds           Int?
+  baths          Int?
+  list_price     Float?           @db.Float
+  user_home_link user_home_link[]
+}
+
+model user {
+  userId         Int              @id @default(autoincrement())
+  username       String           @db.VarChar(100)
+  email          String           @db.VarChar(100)
+  user_home_link user_home_link[]
+}
+
+model user_home_link {
+  userId Int
+  homeId Int
+  user   user @relation(fields: [userId], references: [userId], onDelete: NoAction, onUpdate: NoAction, map: "user_home_link_ibfk_1")
+  home   home @relation(fields: [homeId], references: [homeId], onDelete: NoAction, onUpdate: NoAction, map: "user_home_link_ibfk_2")
+
+  @@id([userId, homeId])
+  @@index([homeId], map: "homeId")
+}
