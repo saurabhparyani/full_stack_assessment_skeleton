@@ -5,6 +5,10 @@ import { useGetUsersQuery, useGetHomesByUserQuery } from "./redux/api";
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
+  const [selectedHome, setSelectedHome] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedHomeStreetAddress, setSelectedHomeStreetAddress] =
+    useState("");
 
   const {
     data: users,
@@ -12,14 +16,20 @@ function App() {
     isError: isErrorUsers,
   } = useGetUsersQuery();
   const {
-    data: homes,
+    data: homesData,
     isLoading: isLoadingHomes,
     isError: isErrorHomes,
-  } = useGetHomesByUserQuery(selectedUser ?? 0, {
-    skip: selectedUser === null,
-  });
+  } = useGetHomesByUserQuery(
+    { userId: selectedUser ?? 0, page: currentPage },
+    { skip: selectedUser === null }
+  );
 
-  const handleOpenModal = () => {
+  const handleOpenModal = (homeId: number) => {
+    const selectedHome = homesData?.homes.find(
+      (home) => home.homeId === homeId
+    );
+    setSelectedHome(homeId);
+    setSelectedHomeStreetAddress(selectedHome?.street_address || "");
     setIsModalOpen(true);
   };
 
@@ -30,6 +40,16 @@ function App() {
   const handleSaveChanges = () => {
     // TODO: Handle On save
     setIsModalOpen(false);
+  };
+
+  const handleUserChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const userId = parseInt(event.target.value);
+    setSelectedUser(isNaN(userId) ? null : userId);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
   };
 
   if (isLoadingUsers) {
@@ -44,14 +64,9 @@ function App() {
     );
   }
 
-  const handleUserChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const userId = parseInt(event.target.value);
-    setSelectedUser(isNaN(userId) ? null : userId);
-  };
-
   return (
     <>
-      <div className="flex min-h-screen flex-col pt-5">
+      <div className="flex min-h-screen flex-col pt-5 py-5">
         <div className="flex items-center font-semibold justify-end px-8 mb-5">
           <div>Select user: </div>
           <select
@@ -82,26 +97,49 @@ function App() {
             <div className="col-span-full flex justify-center items-center h-full">
               Error loading homes. Please try again later.
             </div>
-          ) : homes && homes.length > 0 ? (
-            homes.map((home) => (
-              <div key={home.homeId} className="shadow-lg p-4">
-                <div className="flex flex-col w-3/4 text-sm gap-y-1">
-                  <h1 className="text-2xl font-bold">{home.street_address}</h1>
-                  <p>List Price: ${home.list_price?.toLocaleString()}</p>
-                  <p>State: {home.state}</p>
-                  <p>Zip: {home.zip}</p>
-                  <p>Sqft: {home.sqft}</p>
-                  <p>Beds: {home.beds}</p>
-                  <p>Baths: {home.baths}</p>
-                  <button
-                    onClick={handleOpenModal}
-                    className="p-2 mt-3 w-1/2 font-semibold text-white bg-blue-500 rounded-md"
-                  >
-                    Edit Users
-                  </button>
+          ) : homesData && homesData.homes.length > 0 ? (
+            <>
+              {homesData.homes.map((home) => (
+                <div key={home.homeId} className="shadow-lg p-4">
+                  <div className="flex flex-col w-3/4 text-sm gap-y-1">
+                    <h1 className="text-2xl font-bold">
+                      {home.street_address}
+                    </h1>
+                    <p>List Price: ${home.list_price?.toLocaleString()}</p>
+                    <p>State: {home.state}</p>
+                    <p>Zip: {home.zip}</p>
+                    <p>Sqft: {home.sqft}</p>
+                    <p>Beds: {home.beds}</p>
+                    <p>Baths: {home.baths}</p>
+                    <button
+                      onClick={() => handleOpenModal(home.homeId)}
+                      className="p-2 mt-3 w-1/2 font-semibold text-white bg-blue-500 rounded-md"
+                    >
+                      Edit Users
+                    </button>
+                  </div>
                 </div>
+              ))}
+              <div className="col-span-full flex justify-center items-center mt-4">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md mr-2 disabled:bg-gray-300"
+                >
+                  Previous
+                </button>
+                <span className="mx-2">
+                  Page {currentPage} of {homesData.totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === homesData.totalPages}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md ml-2 disabled:bg-gray-300"
+                >
+                  Next
+                </button>
               </div>
-            ))
+            </>
           ) : (
             <div className="col-span-full flex justify-center items-center h-full">
               No homes found for this user.
@@ -109,11 +147,15 @@ function App() {
           )}
         </div>
       </div>
-      <EditUserModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onSave={handleSaveChanges}
-      />
+      {isModalOpen && selectedHome !== null && (
+        <EditUserModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onSave={handleSaveChanges}
+          homeId={selectedHome}
+          homeStreetAddress={selectedHomeStreetAddress}
+        />
+      )}
     </>
   );
 }
