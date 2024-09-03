@@ -128,8 +128,177 @@ docker-compose -f docker-compose.initial.yml up --build -d
   - instead you directly write SQL script, that makes all the changes you want to the DB
 
 ### solution
+1. start by spinning up a MySQL db container by docker
 
-> explain briefly your solution for this problem here
+`docker-compose -f docker-compose.initial.yml up --build -d` 
+
+2. go to MySQL workbench and create a new connection with the credentials given in the dockerfile. username: db_user, password: 6equj5_db_user
+2. creating the `99_final_db_dump.sql` 
+
+### 99_final_db_dump.sql
+
+the goal is to create separate tables and make a relationship between the user table and home table.
+
+1. create user table and home table. 
+    
+    user table
+    
+    - i’m going to simply add the username and email fields here. my user table will have an id which will be auto incremented and will be a primary key. i’m also normalizing the data and making the fields NOT NULL to maintain data integrity.
+    
+    ```
+    CREATE TABLE user (
+        userId INT AUTO_INCREMENT PRIMARY KEY,
+        username varchar(100) NOT NULL,
+        email varchar(100) NOT NULL
+    )
+    ```
+    
+    home table
+    
+    - similarly, my home table with will have a homeId as my primary key with auto increment, a NOT NULL street address and other attributes (state, zip, sqft, beds, baths, list_price)
+    
+    ```sql
+    CREATE TABLE home (
+        homeId INT AUTO_INCREMENT PRIMARY KEY,
+        street_address varchar(255) NOT NULL,
+        `state` varchar(50),
+        zip varchar(10),
+        sqft float,
+        beds int,
+        baths int,
+        list_price float
+    )
+    ```
+    
+2. junction table - user_home_link
+    
+    i wish to store the pairs of userId and homeId to link the users to the homes they are interested in. i will store the foreign keys that link to user’s userId and home’s homeId. 
+    
+    lastly, i will create a relationship between the userId in the newly junction table and the userId of user. same goes for home. to make sure we only have a unique user-home relationship, i’ll also use a primary key.
+    
+    ```sql
+    CREATE TABLE user_home_link (
+        userId INT,
+        homeId INT,
+        FOREIGN KEY (userId) REFERENCES user(userId),
+        FOREIGN KEY (homeId) REFERENCES home(homeId),
+        PRIMARY KEY (userId, homeId),
+    );
+    ```
+    
+3. data migration from the old non-normalized user_home to the new tables (normalized)
+    
+    since i already have stuff in the old user_home table, i want to bring it into my individual user, home and user_home_link tables.
+    
+    to migrate user info from user_home, i can simply do:
+    
+    `INSERT INTO user (email, username)`
+    
+    and i’m extracting these from the user_home table. 
+    
+    `SELECT DISTINCT username, email FROM user_home` 
+    
+    ```sql
+    INSERT INTO user (username, email)
+    SELECT DISTINCT username,email FROM user_home;
+    ```
+    
+    similarly, i will also migrate home info from user_home
+    
+    ```sql
+    INSERT INTO home (street_address, `state`, zip, sqft, beds, baths, list_price)
+    SELECT DISTINCT street_address, `state`, zip, sqft, beds, baths, list_price FROM user_home;
+    ```
+    
+    now i need to put map these users to their corresponding homes by creating entries in the `user_home_link` table, which will establish the relationships between them
+    
+    - insert the userId and homeId pairs into the user_home_link table.
+    - select the userId from user and homeId from home
+    - match the users and homes from the original `user_home` table using their respective attributes.
+    
+    finally, clean up and drop the old non-normalized user_home table.
+    
+    ```
+    
+    INSERT INTO user_home_link (userId, homeId)
+    SELECT u.userId, h.homeId
+    FROM user_home uh
+    JOIN user u ON uh.username = u.username AND uh.email = u.email
+    JOIN home h ON uh.street_address = h.street_address;
+    
+    -- Drop the original user_home table
+    DROP TABLE user_home;
+    ```
+    
+    this is the complete 99_final_db_dump.sql file:
+    
+    ```
+    USE home_db;
+    
+    -- Create a user table with username and email attributes
+    CREATE TABLE user (
+        userId INT AUTO_INCREMENT PRIMARY KEY,
+        username varchar(100) NOT NULL,
+        email varchar(100) NOT NULL
+    )
+    
+    -- Create a home table with attributes like street address, state, zip, sqft, beds, baths, and list price
+    CREATE TABLE home (
+        homeId INT AUTO_INCREMENT PRIMARY KEY,
+        street_address varchar(255) NOT NULL,
+        `state` varchar(50),
+        zip varchar(10),
+        sqft float,
+        beds int,
+        baths int,
+        list_price float
+    )
+    
+    -- Create a junction table to represent the many-to-many relationship between users and homes
+    CREATE TABLE user_home_link (
+        userId INT,
+        homeId INT,
+        FOREIGN KEY (userId) REFERENCES user(userId),
+        FOREIGN KEY (homeId) REFERENCES home(homeId),
+        PRIMARY KEY (userId, homeId),
+    );
+    
+    -- Migrate user data from the user_home table to the user table
+    INSERT INTO user (username, email)
+    SELECT DISTINCT username,email FROM user_home;
+    
+    -- Migrate home data from the user_home table to the home table
+    INSERT INTO home (street_address, `state`, zip, sqft, beds, baths, list_price)
+    SELECT DISTINCT street_address, `state`, zip, sqft, beds, baths, list_price FROM user_home;
+    
+    -- Populate the junction table and match the users and homes from the original user_home table using their respective attributes.
+    INSERT INTO user_home_link (userId, homeId)
+    SELECT u.userId, h.homeId
+    FROM user_home uh
+    JOIN user u ON uh.username = u.username AND uh.email = u.email
+    JOIN home h ON uh.street_address = h.street_address;
+    
+    -- Clean up and drop the original user_home table
+    DROP TABLE user_home;
+    
+    ```
+    
+- stop the already running db container:  `docker-compose -f docker-compose.initial.yml down`
+- delete the volumes associated with the mysql container:
+    
+    `docker volume rm full_stack_assessment_skeleton_mysql_vol`
+    
+- fire up the new one: 
+ `docker-compose -f docker-compose.final.yml up --build -d`
+- check running containers by `docker ps` and if the container stops, run it again: `docker start mysql_ctn_final`
+- once started, head over to MySQL workbench and add credentials: 
+username: db_user, password: 6equj5_db_user
+- you should be able to see the following tables:
+
+   ![home table](https://github.com/user-attachments/assets/73a3c84e-58ef-4d51-95a0-212d4e60bbe3)
+   ![user table](https://github.com/user-attachments/assets/6f625939-98d2-4b4d-9eb8-19c898ff91d5)
+  ![user_home_link](https://github.com/user-attachments/assets/c0323811-fa6b-4e30-b72f-34a60f769bd1)
+
 
 ## 2. React SPA
 
