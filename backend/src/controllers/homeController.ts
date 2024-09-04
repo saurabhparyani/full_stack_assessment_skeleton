@@ -50,4 +50,35 @@ export async function getHomesByUser(req: Request, res: Response) {
   }
 }
 
-export async function updateUsers() {}
+export async function updateUsers(req: Request, res: Response) {
+    const { homeId, userIds } = req.body;
+
+    if (!homeId || !Array.isArray(userIds)) {
+        return res.status(400).json({ error: "Home ID and user IDs are required." });
+    }
+
+    try {
+        // Start a transaction to ensure data consistency
+        await prisma.$transaction(async (prisma) => {
+            // Remove existing associations
+            await prisma.user_home_link.deleteMany({
+                where: { homeId }
+            });
+
+            // Add new associations
+            const newLinks = userIds.map(userId => ({
+                userId,
+                homeId,
+            }));
+
+            await prisma.user_home_link.createMany({
+                data: newLinks,
+            });
+        });
+
+        res.status(200).json({ message: "Users updated successfully." });
+    } catch (error) {
+        console.error('Error updating users:', error);
+        res.status(500).json({ error: "An error occurred while updating users." });
+    }
+}

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import EditUserModal from "./components/EditUserModal";
 import { useGetUsersQuery, useGetHomesByUserQuery } from "./redux/api";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,6 +21,7 @@ function App() {
     data: homesData,
     isLoading: isLoadingHomes,
     isError: isErrorHomes,
+    refetch: refetchHomes,
   } = useGetHomesByUserQuery(
     { userId: selectedUser ?? 0, page: currentPage },
     { skip: selectedUser === null }
@@ -37,9 +40,8 @@ function App() {
     setIsModalOpen(false);
   };
 
-  const handleSaveChanges = () => {
-    // TODO: Handle On save
-    setIsModalOpen(false);
+  const handleSaveComplete = () => {
+    refetchHomes();
   };
 
   const handleUserChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -69,20 +71,24 @@ function App() {
       <div className="flex min-h-screen flex-col pt-5 py-5">
         <div className="flex items-center font-semibold justify-end px-8 mb-5">
           <div>Select user: </div>
-          <select
-            name="users"
-            id="users"
-            className="border border-gray-200 rounded-md mx-4 px-2 py-1"
-            onChange={handleUserChange}
-            value={selectedUser ?? ""}
-          >
-            <option value="">None</option>
-            {users?.map((user) => (
-              <option key={user.userId} value={user.userId}>
-                {user.username}
-              </option>
-            ))}
-          </select>
+          {isLoadingUsers ? (
+            <Skeleton width={200} height={30} />
+          ) : (
+            <select
+              name="users"
+              id="users"
+              className="border border-gray-200 rounded-md mx-4 px-2 py-1"
+              onChange={handleUserChange}
+              value={selectedUser ?? ""}
+            >
+              <option value="">None</option>
+              {users?.map((user) => (
+                <option key={user.userId} value={user.userId}>
+                  {user.username}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="px-4 grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 flex-grow">
           {selectedUser === null ? (
@@ -90,9 +96,13 @@ function App() {
               nothing to show
             </div>
           ) : isLoadingHomes ? (
-            <div className="col-span-full flex justify-center items-center h-full">
-              Loading homes...
-            </div>
+            Array.from({ length: 10 }).map((_, index) => (
+              <div key={index} className="shadow-lg p-4">
+                <Skeleton height={30} width="80%" />
+                <Skeleton count={6} />
+                <Skeleton height={40} width="50%" className="mt-3" />
+              </div>
+            ))
           ) : isErrorHomes ? (
             <div className="col-span-full flex justify-center items-center h-full">
               Error loading homes. Please try again later.
@@ -151,7 +161,7 @@ function App() {
         <EditUserModal
           isOpen={isModalOpen}
           onClose={handleCloseModal}
-          onSave={handleSaveChanges}
+          onSaveComplete={handleSaveComplete}
           homeId={selectedHome}
           homeStreetAddress={selectedHomeStreetAddress}
         />
