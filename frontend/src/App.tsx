@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import EditUserModal from "./components/EditUserModal";
 import { useGetUsersQuery, useGetHomesByUserQuery } from "./redux/api";
 import Skeleton from "react-loading-skeleton";
@@ -6,17 +6,23 @@ import "react-loading-skeleton/dist/skeleton.css";
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<number | null>(null);
+  const [selectedUser, setSelectedUser] = useState<number | null>(() => {
+    const savedUser = localStorage.getItem("selectedUser");
+    return savedUser ? parseInt(savedUser) : null;
+  });
   const [selectedHome, setSelectedHome] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedHomeStreetAddress, setSelectedHomeStreetAddress] =
     useState("");
 
+  // get users
   const {
     data: users,
     isLoading: isLoadingUsers,
     isError: isErrorUsers,
   } = useGetUsersQuery();
+
+  // get homes for selectedUser
   const {
     data: homesData,
     isLoading: isLoadingHomes,
@@ -27,6 +33,14 @@ function App() {
     { skip: selectedUser === null }
   );
 
+  // save the selected user in local storage
+  useEffect(() => {
+    if (selectedUser !== null) {
+      localStorage.setItem("selectedUser", selectedUser.toString());
+    }
+  }, [selectedUser]);
+
+  // populate the selectedHome and selectedHomeStreetAddress and open the modal
   const handleOpenModal = (homeId: number) => {
     const selectedHome = homesData?.homes.find(
       (home) => home.homeId === homeId
@@ -55,7 +69,11 @@ function App() {
   };
 
   if (isLoadingUsers) {
-    return <div className="pt-5 flex items-center">Loading users...</div>;
+    return (
+      <div className="pt-5 flex items-center justify-center">
+        Loading users...
+      </div>
+    );
   }
 
   if (isErrorUsers) {
@@ -82,6 +100,7 @@ function App() {
               value={selectedUser ?? ""}
             >
               <option value="">None</option>
+              {/* populate the dropdown with users */}
               {users?.map((user) => (
                 <option key={user.userId} value={user.userId}>
                   {user.username}
@@ -96,6 +115,7 @@ function App() {
               nothing to show
             </div>
           ) : isLoadingHomes ? (
+            // SKELETONS
             Array.from({ length: 10 }).map((_, index) => (
               <div key={index} className="shadow-lg p-4">
                 <Skeleton height={30} width="80%" />
@@ -109,6 +129,27 @@ function App() {
             </div>
           ) : homesData && homesData.homes.length > 0 ? (
             <>
+              {/* PAGINATION */}
+              <div className="col-span-full flex justify-center items-center mt-4">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md mr-2 disabled:bg-gray-300"
+                >
+                  Previous
+                </button>
+                <span className="mx-2">
+                  Page {currentPage} of {homesData.totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === homesData.totalPages}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md ml-2 disabled:bg-gray-300"
+                >
+                  Next
+                </button>
+              </div>
+              {/* HOME CARDS */}
               {homesData.homes.map((home) => (
                 <div key={home.homeId} className="shadow-lg p-4">
                   <div className="flex flex-col w-3/4 text-sm gap-y-1">
@@ -130,25 +171,6 @@ function App() {
                   </div>
                 </div>
               ))}
-              <div className="col-span-full flex justify-center items-center mt-4">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-md mr-2 disabled:bg-gray-300"
-                >
-                  Previous
-                </button>
-                <span className="mx-2">
-                  Page {currentPage} of {homesData.totalPages}
-                </span>
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === homesData.totalPages}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-md ml-2 disabled:bg-gray-300"
-                >
-                  Next
-                </button>
-              </div>
             </>
           ) : (
             <div className="col-span-full flex justify-center items-center h-full">
@@ -157,6 +179,7 @@ function App() {
           )}
         </div>
       </div>
+      {/* edit user modal component */}
       {isModalOpen && selectedHome !== null && (
         <EditUserModal
           isOpen={isModalOpen}

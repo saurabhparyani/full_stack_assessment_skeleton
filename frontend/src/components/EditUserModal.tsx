@@ -27,13 +27,17 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
   onSaveComplete,
 }) => {
   const dispatch = useAppDispatch();
+  // get the checked/selected users from redux store
   const selectedUsers = useAppSelector((state) => state.user.selectedUsers);
 
+  // fetch all users for dropdown
   const {
     data: users,
     isLoading: isLoadingUsers,
     isError: isErrorUsers,
   } = useGetUsersQuery();
+
+  // fetch related users for the selected home in the modal
   const {
     data: relatedUsers,
     isLoading: isLoadingRelatedUsers,
@@ -44,9 +48,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
   const [updateUsers, { isLoading: isUpdating }] = useUpdateUsersMutation();
 
   useEffect(() => {
+    // for every related user that is checked, set the selectedUsers in the redux store
     if (relatedUsers) {
       dispatch(setSelectedUsers(relatedUsers.map((user) => user.userId)));
     }
+    // clear selected users when component unmounts
     return () => {
       dispatch(clearSelectedUsers());
     };
@@ -57,11 +63,13 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
   };
 
   const handleSave = async () => {
+    // get the selected users from the redux store and convert them to an array of userIds
     const selectedUserIds = Object.entries(selectedUsers)
       .filter(([, isSelected]) => isSelected)
       .map(([userId]) => parseInt(userId));
 
     try {
+      // update the users for the selected home and refetch the related users
       await updateUsers({ homeId, userIds: selectedUserIds }).unwrap();
       onSaveComplete();
       onClose();
@@ -96,6 +104,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
           Modify Users for: {homeStreetAddress}
         </h2>
         <div className="flex flex-col gap-y-2 justify-center">
+          {/* CHECKBOXES */}
           {users?.map((user) => (
             <div key={user.userId}>
               <input
@@ -128,6 +137,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
             {isUpdating ? "Saving..." : "Save"}
           </button>
         </div>
+        {/* when no users are selected, show error */}
         {isSaveDisabled && (
           <p className="text-red-500 mt-2">
             At least one user must be selected.

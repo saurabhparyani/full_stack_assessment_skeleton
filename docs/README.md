@@ -132,156 +132,40 @@ docker-compose -f docker-compose.initial.yml up --build -d
 
 `docker-compose -f docker-compose.initial.yml up --build -d` 
 
-2. go to MySQL workbench and create a new connection with the credentials given in the dockerfile. username: db_user, password: 6equj5_db_user
+2. go to MySQL workbench and create a new connection with the credentials given in the dockerfile. username: ```db_user```, password: ```6equj5_db_user```
 2. creating the `99_final_db_dump.sql` 
 
-### 99_final_db_dump.sql
+##### 99_final_db_dump.sql
 
-the goal is to create separate tables and make a relationship between the user table and home table.
+the solution involves creating a normalized database structure and migrating data from the original table. here's a high-level overview:
 
-1. create user table and home table. 
-    
-    user table
-    
-    - i’m going to simply add the username and email fields here. my user table will have an id which will be auto incremented and will be a primary key. i’m also normalizing the data and making the fields NOT NULL to maintain data integrity.
-    
-    ```
-    CREATE TABLE user (
-        userId INT AUTO_INCREMENT PRIMARY KEY,
-        username varchar(100) NOT NULL,
-        email varchar(100) NOT NULL
-    )
-    ```
-    
-    home table
-    
-    - similarly, my home table with will have a homeId as my primary key with auto increment, a NOT NULL street address and other attributes (state, zip, sqft, beds, baths, list_price)
-    
-    ```sql
-    CREATE TABLE home (
-        homeId INT AUTO_INCREMENT PRIMARY KEY,
-        street_address varchar(255) NOT NULL,
-        `state` varchar(50),
-        zip varchar(10),
-        sqft float,
-        beds int,
-        baths int,
-        list_price float
-    )
-    ```
-    
-2. junction table - user_home_link
-    
-    i wish to store the pairs of userId and homeId to link the users to the homes they are interested in. i will store the foreign keys that link to user’s userId and home’s homeId. 
-    
-    lastly, i will create a relationship between the userId in the newly junction table and the userId of user. same goes for home. to make sure we only have a unique user-home relationship, i’ll also use a primary key.
-    
-    ```sql
-    CREATE TABLE user_home_link (
-        userId INT,
-        homeId INT,
-        FOREIGN KEY (userId) REFERENCES user(userId),
-        FOREIGN KEY (homeId) REFERENCES home(homeId),
-        PRIMARY KEY (userId, homeId),
-    );
-    ```
-    
-3. data migration from the old non-normalized user_home to the new tables (normalized)
-    
-    since i already have stuff in the old user_home table, i want to bring it into my individual user, home and user_home_link tables.
-    
-    to migrate user info from user_home, i can simply do:
-    
-    `INSERT INTO user (email, username)`
-    
-    and i’m extracting these from the user_home table. 
-    
-    `SELECT DISTINCT username, email FROM user_home` 
-    
-    ```sql
-    INSERT INTO user (username, email)
-    SELECT DISTINCT username,email FROM user_home;
-    ```
-    
-    similarly, i will also migrate home info from user_home
-    
-    ```sql
-    INSERT INTO home (street_address, `state`, zip, sqft, beds, baths, list_price)
-    SELECT DISTINCT street_address, `state`, zip, sqft, beds, baths, list_price FROM user_home;
-    ```
-    
-    now i need to put map these users to their corresponding homes by creating entries in the `user_home_link` table, which will establish the relationships between them
-    
-    - insert the userId and homeId pairs into the user_home_link table.
-    - select the userId from user and homeId from home
-    - match the users and homes from the original `user_home` table using their respective attributes.
-    
-    finally, clean up and drop the old non-normalized user_home table.
-    
-    ```
-    
-    INSERT INTO user_home_link (userId, homeId)
-    SELECT u.userId, h.homeId
-    FROM user_home uh
-    JOIN user u ON uh.username = u.username AND uh.email = u.email
-    JOIN home h ON uh.street_address = h.street_address;
-    
-    -- Drop the original user_home table
-    DROP TABLE user_home;
-    ```
-    
-    this is the complete 99_final_db_dump.sql file:
-    
-    ```
-    USE home_db;
-    
-    -- Create a user table with username and email attributes
-    CREATE TABLE user (
-        userId INT AUTO_INCREMENT PRIMARY KEY,
-        username varchar(100) NOT NULL,
-        email varchar(100) NOT NULL
-    )
-    
-    -- Create a home table with attributes like street address, state, zip, sqft, beds, baths, and list price
-    CREATE TABLE home (
-        homeId INT AUTO_INCREMENT PRIMARY KEY,
-        street_address varchar(255) NOT NULL,
-        `state` varchar(50),
-        zip varchar(10),
-        sqft float,
-        beds int,
-        baths int,
-        list_price float
-    )
-    
-    -- Create a junction table to represent the many-to-many relationship between users and homes
-    CREATE TABLE user_home_link (
-        userId INT,
-        homeId INT,
-        FOREIGN KEY (userId) REFERENCES user(userId),
-        FOREIGN KEY (homeId) REFERENCES home(homeId),
-        PRIMARY KEY (userId, homeId),
-    );
-    
-    -- Migrate user data from the user_home table to the user table
-    INSERT INTO user (username, email)
-    SELECT DISTINCT username,email FROM user_home;
-    
-    -- Migrate home data from the user_home table to the home table
-    INSERT INTO home (street_address, `state`, zip, sqft, beds, baths, list_price)
-    SELECT DISTINCT street_address, `state`, zip, sqft, beds, baths, list_price FROM user_home;
-    
-    -- Populate the junction table and match the users and homes from the original user_home table using their respective attributes.
-    INSERT INTO user_home_link (userId, homeId)
-    SELECT u.userId, h.homeId
-    FROM user_home uh
-    JOIN user u ON uh.username = u.username AND uh.email = u.email
-    JOIN home h ON uh.street_address = h.street_address;
-    
-    -- Clean up and drop the original user_home table
-    DROP TABLE user_home;
-    
-    ```
+1. create separate tables:
+   - user table: stores user information (userId, username, email)
+   - home table: stores home details (homeId, street_address, state, zip, sqft, beds, baths, list_price)
+   - user_home_link: junction table to represent many-to-many relationship between users and homes
+
+2. set up relationships:
+   - use foreign keys in user_home_link to reference user and home tables
+   - establish a composite primary key in user_home_link for uniqueness
+
+3. migrate data:
+   - transfer user data from user_home to user table
+   - transfer home data from user_home to home table
+   - populate user_home_link with relationships from user_home
+
+4. clean up:
+   - drop the original user_home table
+
+5. create sql script:
+   - write all necessary sql commands in 99_final_db_dump.sql
+   - ensure script transforms database from initial state to solved state
+
+6. verify solution:
+   - restart docker container with new configuration
+   - connect to database and confirm presence of new tables
+   - check data integrity and relationships
+
+this approach normalizes the data, improves data integrity, and establishes proper relationships between users and homes.
     
 - stop the already running db container:  `docker-compose -f docker-compose.initial.yml down`
 - delete the volumes associated with the mysql container:
@@ -289,15 +173,15 @@ the goal is to create separate tables and make a relationship between the user t
     `docker volume rm full_stack_assessment_skeleton_mysql_vol`
     
 - fire up the new one: 
- `docker-compose -f docker-compose.final.yml up --build -d`
-- check running containers by `docker ps` and if the container stops, run it again: `docker start mysql_ctn_final`
+ ```docker-compose -f docker-compose.final.yml up --build -d```
+- check running containers by `docker ps` and if the container stops, run it again: ```docker start mysql_ctn_final```
 - once started, head over to MySQL workbench and add credentials: 
-username: db_user, password: 6equj5_db_user
+username: ```db_user```, password: ```6equj5_db_user```
 - you should be able to see the following tables:
 
    ![home table](https://github.com/user-attachments/assets/73a3c84e-58ef-4d51-95a0-212d4e60bbe3)
    ![user table](https://github.com/user-attachments/assets/6f625939-98d2-4b4d-9eb8-19c898ff91d5)
-  ![user_home_link](https://github.com/user-attachments/assets/c0323811-fa6b-4e30-b72f-34a60f769bd1)
+   ![user_home_link](https://github.com/user-attachments/assets/c0323811-fa6b-4e30-b72f-34a60f769bd1)
 
 
 ## 2. React SPA
@@ -389,7 +273,49 @@ username: db_user, password: 6equj5_db_user
 
 ### solution
 
-> explain briefly your solution for this problem here
+1. setup:
+   - create vite project: ```npm create vite@latest```,name it frontend, choose typescript. 
+   - install dependencies: ```cd frontend && npm install```
+   - add tailwindcss: ```npm install -D tailwindcss postcss autoprefixer```
+   - initialize tailwind: ```npx tailwindcss init -p```
+
+2. redux toolkit and rtk query setup:
+   - install: ```npm install @reduxjs/toolkit react-redux```
+   - create an api slice `api.ts` - this manages data fetching and api calling using RTK query
+   - created user slice `userSlice.ts` that has reducer functions to toggle users and set selected users (in the EditUserModal)
+   - created a ```store.ts``` file that adds the api slice and user slice to the redux store. in ```main.tsx```, wrapped the app in the redux provider.
+   - also added ```hooks/index.ts``` for typescript and redux types. 
+   - define endpoints like getUsers, getHomesByUser, getUsersByHome and updateUsers for user and home data management.
+
+3. components:
+   - create the main app component rendering the user selection dropdown and home cards for the selected user. it manages the state for the selected user and controls the opening and closing of the modal.
+   - !!! [**extra**] also implemented pagination for homes list
+   - create the EditUserModal component that handles modifying the associations between users and homes via checkboxes in a modal.
+   - dispatched redux actions to handle selecting/unselecting users and saves the changes to the backend (mutation).
+
+4. data fetching and state management:
+   - use rtk query hooks (that redux automatically provides you after writing endpoints) to fetch user and home data from the API (in backend)
+   - handle loading states with skeleton loaders (```npm install react-loading-skeleton```)
+   - manage local state with useState for modal and selections
+
+5. ui implementation:
+   - use tailwindcss for styling
+   - create responsive grid layout for home cards
+   - 100% responsive by using sm, md, lg, xl breakpoints
+   - also added persistence for the selected user in local storage using useEffect
+
+6. error handling and validation:
+   - display error messages for failed api calls (eg. if none is the selectedUser)
+   - validate user selections in the EditUserModal so that it disables the save button if no user is selected for a home.
+
+#### test it
+- there's an env variable in the frontend directory.
+ ```VITE_API_BASE_URL=http://localhost:3000/```
+
+- start the deployment server after doing all installations (```npm install```)
+ ```
+ npm run dev
+ ```
 
 ## 3. Backend API development on Node
 
@@ -450,7 +376,32 @@ username: db_user, password: 6equj5_db_user
 
 ### solution
 
-> explain briefly your solution for this problem here
+1. node + express + ts + prisma setup:
+    - use commands -  ```npm init -y```, ```npm install -D typescript ts-node nodemon```, ```npm i express dotenv```, ```npm i -D @types/express @types/dotenv``` and modify tsconfig.json to your preferences and create nodemon.json to always watch for updates
+    - add a script in package.json to run the server - ```"start": "nodemon"```
+    - add a ```PORT=3000``` env variable in the .env file
+    - use commands - ```npm install prisma --save-dev``` ```npx prisma init```
+    - add ```DATABASE_URL="mysql://db_user:6equj5_db_user@localhost:3306/home_db"``` in .env file
+    - generated a prisma schema file in `schema.prisma` by making similar model structure to the one in the DB. 
+    - ensure permissions are given or this will give an error. do this by logging in as a root user(user: `root`, password: `6equj5_root`) in MySQL workbench and run the below script:
+    ```GRANT CREATE, ALTER, DROP, REFERENCES ON *.* TO 'db_user'@'%';```
+    ```FLUSH PRIVILEGES;```
+    - do a ```npx prisma db pull``` to pull the schema from the DB and generate the prisma client using ```npx prisma generate``` after installing the prisma client ```npm i @prisma/client```
+    - create a singleton file `prisma.ts` in the utils directory to make sure that the prisma client is only initialized once and shared across the application.
+
+2. routing
+    - create an organized structure where you have separate routes for `/user` and `/home` and in a routes folder, add individual get and/or put routes for each of the endpoints. these go into controllers and each controller `userController.ts` and `homeController.ts` perform the necessary operations on the DB.
+    - `userController.ts` has 2 main functions.`getAllUsers` and `getUsersByHome`. one is to get all users and the other is to get all users for a chosen home. the first one is a simple query to the DB and the second one is applied on the EditUserModal where for each home, (extract the homeId as a query param to the API), you get the all the users which have a relationship with that home by checking if that homeId is present in the user_home_link junction table.
+    - the `homeController.ts` has 2 main functions. `getHomesByUser` and `updateUsers`. one is to get all homes related to a user and the other is to update the users based on the new associations. the first one is a simple query to the DB, where you return all homes and the paginatedHomes by taking only the first 50 records. (as given in the problem). the second one is to update the users based on the new associations by starting a transaction and first deleting the existing associations (unchecking the checkboxes) and then inserting the new ones. so you perform createMany and deleteMany operations on the user_home_link junction table.
+
+#### test it
+- the .env variable is available and it has: 
+```
+PORT=3000
+DATABASE_URL="mysql://db_user:6equj5_db_user@localhost:3306/home_db"
+```
+
+- start the server by running the command - ```npm run start```
 
 ## Submission Guidelines
 
