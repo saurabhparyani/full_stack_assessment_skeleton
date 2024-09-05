@@ -128,12 +128,23 @@ docker-compose -f docker-compose.initial.yml up --build -d
   - instead you directly write SQL script, that makes all the changes you want to the DB
 
 ### solution
+below are steps i've documented to get things started step-by-step. if you only care about testing, head over to [test-database](#test-database)
 1. start by spinning up a MySQL db container by docker
 
-`docker-compose -f docker-compose.initial.yml up --build -d` 
+```
+docker-compose -f docker-compose.initial.yml up --build -d
+```
 
-2. go to MySQL workbench and create a new connection with the credentials given in the dockerfile. username: ```db_user```, password: ```6equj5_db_user```
-2. creating the `99_final_db_dump.sql` 
+2. go to MySQL workbench and create a new connection with the credentials given in the dockerfile. 
+username: 
+```
+db_user
+```
+password: 
+```
+6equj5_db_user
+```
+3. creating the `99_final_db_dump.sql` 
 
 ##### 99_final_db_dump.sql
 
@@ -166,15 +177,44 @@ the solution involves creating a normalized database structure and migrating dat
    - check data integrity and relationships
 
 this approach normalizes the data, improves data integrity, and establishes proper relationships between users and homes.
+
+#### test database
     
-- stop the already running db container:  `docker-compose -f docker-compose.initial.yml down`
-- delete the volumes associated with the mysql container:
+- stop the already running db container:  
+```
+docker-compose -f docker-compose.initial.yml down
+```
+
+- delete the volumes associated with the mysql container (if any):
     
-    `docker volume rm full_stack_assessment_skeleton_mysql_vol`
+```
+docker volume rm full_stack_assessment_skeleton_mysql_vol
+```
     
 - fire up the new one: 
- ```docker-compose -f docker-compose.final.yml up --build -d```
-- check running containers by `docker ps` and if the container stops, run it again: ```docker start mysql_ctn_final```
+ ```
+docker-compose -f docker-compose.final.yml up --build -d
+```
+- you may have to stop the MySQL service running if it's already running in the background because MySQL also runs on the same port. Head over to Services, if you're on a windows, and just stop the service and try the above command again. If you're on a mac, it's
+```
+brew services stop mysql
+```
+and on linux, 
+```
+sudo systemctl stop mysql
+```
+Once you've stopped the MySQL service, try running the docker-compose command again.
+
+
+- check running containers by 
+```
+docker ps
+```
+and if the container stops, run it again: 
+```
+docker start mysql_ctn_final
+```
+
 - once started, head over to MySQL workbench and add credentials: 
 username: ```db_user```, password: ```6equj5_db_user```
 - you should be able to see the following tables:
@@ -272,6 +312,7 @@ username: ```db_user```, password: ```6equj5_db_user```
 > even if you can do state-management without Redux, you still must use Redux for the solution, (remember the idea is to showcase the skills)
 
 ### solution
+below are steps i've documented to get things started step-by-step. if you only care about testing, head over to [test-frontend](#test-frontend)
 
 1. setup:
    - create vite project: ```npm create vite@latest```,name it frontend, choose typescript. 
@@ -308,11 +349,19 @@ username: ```db_user```, password: ```6equj5_db_user```
    - display error messages for failed api calls (eg. if none is the selectedUser)
    - validate user selections in the EditUserModal so that it disables the save button if no user is selected for a home.
 
-#### test it
-- there's an env variable in the frontend directory.
+#### test frontend
+- note that there's an env variable in the frontend directory.
  ```VITE_API_BASE_URL=http://localhost:3000/```
 
-- start the deployment server after doing all installations (```npm install```)
+- cd inside frontend in another terminal:
+```
+cd frontend
+```
+- install necessary packages:
+```
+npm install
+```
+- start the deployment server and see the app running on ```localhost:5173``` (it might say error loading users as you haven't setup the backend yet)
  ```
  npm run dev
  ```
@@ -375,6 +424,7 @@ username: ```db_user```, password: ```6equj5_db_user```
     - we do NOT want raw SQL, if none of above works, you can use any ORM you know, but please mention and link to it in the README
 
 ### solution
+below are steps i've documented to get things started step-by-step. if you only care about testing, head over to [test-backend](#test-backend)
 
 1. node + express + ts + prisma setup:
     - use commands -  ```npm init -y```, ```npm install -D typescript ts-node nodemon```, ```npm i express dotenv```, ```npm i -D @types/express @types/dotenv``` and modify tsconfig.json to your preferences and create nodemon.json to always watch for updates
@@ -394,14 +444,21 @@ username: ```db_user```, password: ```6equj5_db_user```
     - `userController.ts` has 2 main functions.`getAllUsers` and `getUsersByHome`. one is to get all users and the other is to get all users for a chosen home. the first one is a simple query to the DB and the second one is applied on the EditUserModal where for each home, (extract the homeId as a query param to the API), you get the all the users which have a relationship with that home by checking if that homeId is present in the user_home_link junction table.
     - the `homeController.ts` has 2 main functions. `getHomesByUser` and `updateUsers`. one is to get all homes related to a user and the other is to update the users based on the new associations. the first one is a simple query to the DB, where you return all homes and the paginatedHomes by taking only the first 50 records. (as given in the problem). the second one is to update the users based on the new associations by starting a transaction and first deleting the existing associations (unchecking the checkboxes) and then inserting the new ones. so you perform createMany and deleteMany operations on the user_home_link junction table.
 
-#### test it
-- the .env variable is available and it has: 
+#### test backend
+- note that the .env variable is available and it has: 
 ```
 PORT=3000
 DATABASE_URL="mysql://db_user:6equj5_db_user@localhost:3306/home_db"
 ```
+- go inside the backend directory in another terminal:
+```
+cd backend
+```
 
-- start the server by running the command - ```npm run start```
+- start the server by running the command - 
+```
+npm run start
+```
 
 ## Submission Guidelines
 
